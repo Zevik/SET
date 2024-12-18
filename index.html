@@ -5,29 +5,105 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SET Game Image Analyzer</title>
     <style>
-        /* ... כל הסגנונות הקודמים ... */
+        body {
+            margin: 0;
+            padding: 15px;
+            max-width: 100%;
+            box-sizing: border-box;
+            font-family: system-ui, -apple-system, sans-serif;
+        }
+
+        h1 {
+            font-size: 24px;
+            margin: 10px 0;
+            text-align: center;
+        }
+
+        @media (max-width: 600px) {
+            h1 {
+                font-size: 20px;
+            }
+        }
+
+        .version {
+            position: fixed;
+            top: 5px;
+            left: 5px;
+            font-size: 12px;
+            color: #666;
+            z-index: 1000;
+        }
+
         .upload-container {
             text-align: center;
-            margin: 20px 0;
+            margin: 20px auto;
             padding: 20px;
             border: 2px dashed #ccc;
             border-radius: 8px;
+            max-width: 500px;
+            width: 90%;
         }
+
+        .upload-container button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        @media (max-width: 600px) {
+            .upload-container button {
+                width: 100%;
+                padding: 15px;
+                font-size: 18px;
+            }
+        }
+
         #uploadedImage {
             max-width: 100%;
-            margin: 20px 0;
+            height: auto;
+            margin: 20px auto;
             border-radius: 8px;
             display: none;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
         }
+
         #analysisCanvas {
             max-width: 100%;
-            margin: 20px 0;
+            height: auto;
+            margin: 20px auto;
             border-radius: 8px;
             display: none;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        #results {
+            max-width: 500px;
+            margin: 20px auto;
+            padding: 10px;
+        }
+
+        .result {
+            background: #f5f5f5;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        @media (max-width: 600px) {
+            #results {
+                width: 100%;
+                padding: 5px;
+            }
         }
     </style>
 </head>
 <body>
+    <div class="version">v0.1</div>
     <h1>מזהה סדרות במשחק SET</h1>
     
     <div class="upload-container">
@@ -44,7 +120,7 @@
         // פונקציות עזר לעיבוד תמונה
         function detectCards(imageData) {
             const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
+            const ctx = canvas.getContext('2d', { willReadFrequently: true });
             canvas.width = imageData.width;
             canvas.height = imageData.height;
             ctx.putImageData(imageData, 0, 0);
@@ -162,6 +238,57 @@
             return 'solid';
         }
 
+                function isValidSet(cards) {
+            if (cards.length !== 3) return false;
+            
+            // בדוק שכל התכונות (צבע, צורה, מספר, מילוי) הן או זהות לגמרי או שונות לגמרי
+            const properties = ['color', 'shape', 'count', 'fill'];
+            
+            return properties.every(prop => {
+                const values = new Set(cards.map(card => card[prop]));
+                return values.size === 1 || values.size === 3;
+            });
+        }
+
+        function findSets(cards) {
+            const sets = [];
+            
+            // עבור על כל שלשת הקלפים אפשרית
+            for (let i = 0; i < cards.length - 2; i++) {
+                for (let j = i + 1; j < cards.length - 1; j++) {
+                    for (let k = j + 1; k < cards.length; k++) {
+                        const potentialSet = [cards[i], cards[j], cards[k]];
+                        if (isValidSet(potentialSet)) {
+                            sets.push(potentialSet);
+                        }
+                    }
+                }
+            }
+            
+            return sets;
+        }
+
+        function translateToHebrew(value) {
+            const translations = {
+                // צבעים
+                'red': 'אדום',
+                'green': 'ירוק',
+                'purple': 'סגול',
+                
+                // צורות
+                'diamond': 'יהלום',
+                'squiggle': 'גל',
+                'oval': 'אליפסה',
+                
+                // מילוי
+                'solid': 'מלא',
+                'striped': 'מפוספס',
+                'empty': 'ריק'
+            };
+            
+            return translations[value] || value;
+        }
+
         // טיפול בהעלאת תמונה
         document.getElementById('imageInput').addEventListener('change', handleImageUpload);
 
@@ -180,7 +307,7 @@
 
                     // הכן קנבס לניתוח
                     const canvas = document.getElementById('analysisCanvas');
-                    const ctx = canvas.getContext('2d');
+                    const ctx = canvas.getContext('2d', { willReadFrequently: true });
                     canvas.width = img.width;
                     canvas.height = img.height;
                     ctx.drawImage(img, 0, 0);
@@ -236,7 +363,56 @@
             });
         }
 
-        // פונקציות נוספות שהיו קודם (isValidSet, findSets, translateToHebrew וכו')...
+        function isValidSet(cards) {
+            if (cards.length !== 3) return false;
+            
+            // בדוק שכל התכונות (צבע, צורה, מספר, מילוי) הן או זהות לגמרי או שונות לגמרי
+            const properties = ['color', 'shape', 'count', 'fill'];
+            
+            return properties.every(prop => {
+                const values = new Set(cards.map(card => card[prop]));
+                return values.size === 1 || values.size === 3;
+            });
+        }
+
+        function findSets(cards) {
+            const sets = [];
+            
+            // עבור על כל שלשת הקלפים אפשרית
+            for (let i = 0; i < cards.length - 2; i++) {
+                for (let j = i + 1; j < cards.length - 1; j++) {
+                    for (let k = j + 1; k < cards.length; k++) {
+                        const potentialSet = [cards[i], cards[j], cards[k]];
+                        if (isValidSet(potentialSet)) {
+                            sets.push(potentialSet);
+                        }
+                    }
+                }
+            }
+            
+            return sets;
+        }
+
+        function translateToHebrew(value) {
+            const translations = {
+                // צבעים
+                'red': 'אדום',
+                'green': 'ירוק',
+                'purple': 'סגול',
+                
+                // צורות
+                'diamond': 'יהלום',
+                'squiggle': 'גל',
+                'oval': 'אליפסה',
+                
+                // מילוי
+                'solid': 'מלא',
+                'striped': 'מפוספס',
+                'empty': 'ריק'
+            };
+            
+            return translations[value] || value;
+        }
     </script>
 </body>
 </html>
