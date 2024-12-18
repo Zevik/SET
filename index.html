@@ -2,6 +2,7 @@
 <html dir="rtl">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SET Game Analyzer</title>
     <style>
         body {
@@ -10,50 +11,102 @@
             margin: 0 auto;
             padding: 20px;
             background-color: #f5f5f5;
+            line-height: 1.6;
         }
-        h1 {
+        h1, h2, h3 {
             color: #333;
             text-align: center;
+            margin-bottom: 20px;
         }
         .controls {
             margin: 20px 0;
             text-align: center;
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
         }
         .result {
             margin: 20px 0;
-            padding: 15px;
+            padding: 20px;
             background-color: white;
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+        }
+        .result:hover {
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            transform: translateY(-2px);
         }
         .card-display {
             display: flex;
             flex-wrap: wrap;
-            gap: 10px;
+            gap: 15px;
             margin: 20px 0;
+            justify-content: center;
         }
         .card {
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
             background-color: white;
+            min-width: 150px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            transition: all 0.3s ease;
+        }
+        .card:hover {
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            transform: translateY(-2px);
         }
         button {
-            padding: 10px 20px;
+            padding: 12px 24px;
             background-color: #4CAF50;
             color: white;
             border: none;
             border-radius: 5px;
             cursor: pointer;
-            margin: 5px;
+            font-size: 16px;
+            transition: background-color 0.3s ease;
         }
         button:hover {
             background-color: #45a049;
         }
+        button:active {
+            transform: translateY(1px);
+        }
         .set-explanation {
             color: #666;
             font-size: 0.9em;
-            margin-top: 10px;
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .error {
+            color: #d32f2f;
+            background-color: #ffebee;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            display: none;
+        }
+        @media (max-width: 600px) {
+            body {
+                padding: 10px;
+            }
+            .card {
+                min-width: calc(50% - 20px);
+            }
+            button {
+                width: 100%;
+                margin-bottom: 10px;
+            }
         }
     </style>
 </head>
@@ -64,10 +117,32 @@
         <button onclick="findAllSets()">מצא סטים אפשריים</button>
         <button onclick="showPotentialCompletions()">הצג השלמות אפשריות</button>
     </div>
+    <div id="error" class="error"></div>
+    <div id="loading" class="loading">טוען...</div>
     <div id="currentCards" class="card-display"></div>
     <div id="results"></div>
 
     <script>
+        // תרגום מאנגלית לעברית
+        function translateToHebrew(value) {
+            const translations = {
+                'red': 'אדום',
+                'blue': 'כחול',
+                'green': 'ירוק',
+                'diamond': 'יהלום',
+                'squiggle': 'גל',
+                'oval': 'אליפסה',
+                'empty': 'ריק',
+                'striped': 'מפוספס',
+                'solid': 'מלא',
+                'color': 'צבע',
+                'shape': 'צורה',
+                'count': 'מספר',
+                'fill': 'מילוי'
+            };
+            return translations[value] || value;
+        }
+
         // נתוני הקלפים הנוכחיים
         const cards = [
             { color: 'blue', shape: 'diamond', count: 1, fill: 'empty' },
@@ -106,6 +181,32 @@
             return sets;
         }
 
+        // חישוב הערך השלישי הנדרש לסט
+        function calculateThirdValue(val1, val2) {
+            if (val1 === val2) return val1;
+            
+            const allValues = {
+                color: ['red', 'green', 'blue'],
+                shape: ['diamond', 'squiggle', 'oval'],
+                count: [1, 2, 3],
+                fill: ['empty', 'striped', 'solid']
+            };
+            
+            const category = Object.entries(allValues).find(([_, values]) => 
+                values.includes(val1) && values.includes(val2)
+            )[1];
+            
+            return category.find(val => val !== val1 && val !== val2);
+        }
+
+        // בדיקת תקינות קלף
+        function isValidCard(card) {
+            return card.count >= 1 && card.count <= 3 &&
+                   ['red', 'green', 'blue'].includes(card.color) &&
+                   ['diamond', 'squiggle', 'oval'].includes(card.shape) &&
+                   ['empty', 'striped', 'solid'].includes(card.fill);
+        }
+
         // מציאת השלמות אפשריות לסט
         function findPotentialCompletions(cards) {
             const completions = [];
@@ -132,32 +233,26 @@
             return completions;
         }
 
-        function calculateThirdValue(val1, val2) {
-            if (val1 === val2) return val1;
-            
-            const allValues = {
-                color: ['red', 'green', 'blue'],
-                shape: ['diamond', 'squiggle', 'oval'],
-                count: [1, 2, 3],
-                fill: ['empty', 'striped', 'solid']
-            };
-            
-            const category = Object.entries(allValues).find(([_, values]) => 
-                values.includes(val1) && values.includes(val2)
-            )[1];
-            
-            return category.find(val => val !== val1 && val !== val2);
-        }
-
-        function isValidCard(card) {
-            return card.count >= 1 && card.count <= 3 &&
-                   ['red', 'green', 'blue'].includes(card.color) &&
-                   ['diamond', 'squiggle', 'oval'].includes(card.shape) &&
-                   ['empty', 'striped', 'solid'].includes(card.fill);
-        }
-
         // פונקציות תצוגה
+        function formatCard(card) {
+            return `${card.count} ${translateToHebrew(card.fill)} ${translateToHebrew(card.color)} ${translateToHebrew(card.shape)}`;
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+            setTimeout(() => {
+                errorDiv.style.display = 'none';
+            }, 3000);
+        }
+
+        function setLoading(isLoading) {
+            document.getElementById('loading').style.display = isLoading ? 'block' : 'none';
+        }
+
         function showCurrentCards() {
+            setLoading(true);
             const container = document.getElementById('currentCards');
             container.innerHTML = '<h2>קלפים נוכחיים:</h2>';
             
@@ -166,15 +261,24 @@
                 cardElement.className = 'card';
                 cardElement.innerHTML = `
                     קלף ${index + 1}:<br>
-                    ${card.count} ${card.fill} ${card.color} ${card.shape}
+                    ${formatCard(card)}
                 `;
                 container.appendChild(cardElement);
             });
+            setLoading(false);
         }
 
         function findAllSets() {
+            setLoading(true);
             const sets = findSets(cards);
             const resultsDiv = document.getElementById('results');
+
+            if (sets.length === 0) {
+                resultsDiv.innerHTML = '<div class="result">לא נמצאו סטים אפשריים</div>';
+                setLoading(false);
+                return;
+            }
+
             resultsDiv.innerHTML = `<h2>נמצאו ${sets.length} סטים:</h2>`;
             
             sets.forEach((set, index) => {
@@ -183,7 +287,7 @@
                 setDiv.innerHTML = `
                     <h3>סט ${index + 1}:</h3>
                     ${set.map(card => 
-                        `<p>${card.count} ${card.fill} ${card.color} ${card.shape}</p>`
+                        `<p>${formatCard(card)}</p>`
                     ).join('')}
                     <div class="set-explanation">
                         ${explainSet(set)}
@@ -191,24 +295,33 @@
                 `;
                 resultsDiv.appendChild(setDiv);
             });
+            setLoading(false);
         }
 
         function showPotentialCompletions() {
+            setLoading(true);
             const completions = findPotentialCompletions(cards);
             const resultsDiv = document.getElementById('results');
             resultsDiv.innerHTML = '<h2>השלמות אפשריות:</h2>';
             
+            if (completions.length === 0) {
+                resultsDiv.innerHTML += '<div class="result">לא נמצאו השלמות אפשריות</div>';
+                setLoading(false);
+                return;
+            }
+
             completions.slice(0, 5).forEach((completion, index) => {
                 const div = document.createElement('div');
                 div.className = 'result';
                 div.innerHTML = `
                     <h3>אפשרות ${index + 1}:</h3>
-                    <p>קלף 1: ${completion.pair[0].count} ${completion.pair[0].fill} ${completion.pair[0].color} ${completion.pair[0].shape}</p>
-                    <p>קלף 2: ${completion.pair[1].count} ${completion.pair[1].fill} ${completion.pair[1].color} ${completion.pair[1].shape}</p>
-                    <p>הקלף הנדרש: ${completion.needed.count} ${completion.needed.fill} ${completion.needed.color} ${completion.needed.shape}</p>
+                    <p>קלף 1: ${formatCard(completion.pair[0])}</p>
+                    <p>קלף 2: ${formatCard(completion.pair[1])}</p>
+                    <p>הקלף הנדרש: ${formatCard(completion.needed)}</p>
                 `;
                 resultsDiv.appendChild(div);
             });
+            setLoading(false);
         }
 
         function explainSet(set) {
@@ -216,16 +329,31 @@
             ['color', 'shape', 'count', 'fill'].forEach(prop => {
                 const values = new Set(set.map(card => card[prop]));
                 if (values.size === 1) {
-                    explanations.push(`כל הקלפים שווים ב${prop} (${set[0][prop]})`);
+                    explanations.push(`כל הקלפים שווים ב${translateToHebrew(prop)} (${translateToHebrew(set[0][prop])})`);
                 } else {
-                    explanations.push(`כל הקלפים שונים ב${prop} (${Array.from(values).join(', ')})`);
+                    const translatedValues = Array.from(values).map(v => translateToHebrew(v));
+                    explanations.push(`כל הקלפים שונים ב${translateToHebrew(prop)} (${translatedValues.join(', ')})`);
                 }
             });
             return explanations.join('<br>');
         }
 
-        // הצג את הקלפים הנוכחיים בטעינה
-        showCurrentCards();
+        // טעינה ראשונית
+        document.addEventListener('DOMContentLoaded', function() {
+            try {
+                showCurrentCards();
+            } catch (error) {
+                showError('אירעה שגיאה בטעינת המשחק');
+                console.error('Error:', error);
+            }
+        });
+
+        // טיפול בשגיאות כלליות
+        window.onerror = function(msg, url, lineNo, columnNo, error) {
+            showError('אירעה שגיאה בלתי צפויה');
+            console.error('Error:', msg, error);
+            return false;
+        };
     </script>
 </body>
 </html>
