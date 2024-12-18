@@ -3,357 +3,240 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SET Game Analyzer</title>
+    <title>SET Game Image Analyzer</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #f5f5f5;
-            line-height: 1.6;
-        }
-        h1, h2, h3 {
-            color: #333;
+        /* ... כל הסגנונות הקודמים ... */
+        .upload-container {
             text-align: center;
-            margin-bottom: 20px;
-        }
-        .controls {
-            margin: 20px 0;
-            text-align: center;
-            display: flex;
-            justify-content: center;
-            gap: 10px;
-            flex-wrap: wrap;
-        }
-        .result {
             margin: 20px 0;
             padding: 20px;
-            background-color: white;
+            border: 2px dashed #ccc;
             border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            transition: all 0.3s ease;
         }
-        .result:hover {
-            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-            transform: translateY(-2px);
-        }
-        .card-display {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 15px;
+        #uploadedImage {
+            max-width: 100%;
             margin: 20px 0;
-            justify-content: center;
-        }
-        .card {
-            padding: 15px;
-            border: 1px solid #ddd;
             border-radius: 8px;
-            background-color: white;
-            min-width: 150px;
-            text-align: center;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-            transition: all 0.3s ease;
-        }
-        .card:hover {
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-            transform: translateY(-2px);
-        }
-        button {
-            padding: 12px 24px;
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 16px;
-            transition: background-color 0.3s ease;
-        }
-        button:hover {
-            background-color: #45a049;
-        }
-        button:active {
-            transform: translateY(1px);
-        }
-        .set-explanation {
-            color: #666;
-            font-size: 0.9em;
-            margin-top: 15px;
-            padding: 10px;
-            background-color: #f8f9fa;
-            border-radius: 4px;
-        }
-        .loading {
-            display: none;
-            text-align: center;
-            margin: 20px 0;
-        }
-        .error {
-            color: #d32f2f;
-            background-color: #ffebee;
-            padding: 10px;
-            border-radius: 4px;
-            margin: 10px 0;
             display: none;
         }
-        @media (max-width: 600px) {
-            body {
-                padding: 10px;
-            }
-            .card {
-                min-width: calc(50% - 20px);
-            }
-            button {
-                width: 100%;
-                margin-bottom: 10px;
-            }
+        #analysisCanvas {
+            max-width: 100%;
+            margin: 20px 0;
+            border-radius: 8px;
+            display: none;
         }
     </style>
 </head>
 <body>
     <h1>מזהה סדרות במשחק SET</h1>
-    <div class="controls">
-        <button onclick="showCurrentCards()">הצג קלפים נוכחיים</button>
-        <button onclick="findAllSets()">מצא סטים אפשריים</button>
-        <button onclick="showPotentialCompletions()">הצג השלמות אפשריות</button>
+    
+    <div class="upload-container">
+        <input type="file" id="imageInput" accept="image/*" style="display: none;">
+        <button onclick="document.getElementById('imageInput').click()">העלה תמונה</button>
+        <p>או גרור תמונה לכאן</p>
     </div>
-    <div id="error" class="error"></div>
-    <div id="loading" class="loading">טוען...</div>
-    <div id="currentCards" class="card-display"></div>
+
+    <img id="uploadedImage" alt="Uploaded image">
+    <canvas id="analysisCanvas"></canvas>
     <div id="results"></div>
 
     <script>
-        // תרגום מאנגלית לעברית
-        function translateToHebrew(value) {
-            const translations = {
-                'red': 'אדום',
-                'blue': 'כחול',
-                'green': 'ירוק',
-                'diamond': 'יהלום',
-                'squiggle': 'גל',
-                'oval': 'אליפסה',
-                'empty': 'ריק',
-                'striped': 'מפוספס',
-                'solid': 'מלא',
-                'color': 'צבע',
-                'shape': 'צורה',
-                'count': 'מספר',
-                'fill': 'מילוי'
-            };
-            return translations[value] || value;
-        }
+        // פונקציות עזר לעיבוד תמונה
+        function detectCards(imageData) {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = imageData.width;
+            canvas.height = imageData.height;
+            ctx.putImageData(imageData, 0, 0);
 
-        // נתוני הקלפים הנוכחיים
-        const cards = [
-            { color: 'blue', shape: 'diamond', count: 1, fill: 'empty' },
-            { color: 'red', shape: 'diamond', count: 2, fill: 'empty' },
-            { color: 'green', shape: 'squiggle', count: 2, fill: 'empty' },
-            { color: 'blue', shape: 'oval', count: 3, fill: 'empty' },
-            { color: 'red', shape: 'squiggle', count: 1, fill: 'empty' },
-            { color: 'red', shape: 'squiggle', count: 2, fill: 'empty' },
-            { color: 'green', shape: 'oval', count: 3, fill: 'striped' },
-            { color: 'red', shape: 'diamond', count: 3, fill: 'solid' },
-            { color: 'green', shape: 'diamond', count: 3, fill: 'striped' },
-            { color: 'green', shape: 'squiggle', count: 2, fill: 'solid' }
-        ];
+            // המרה לגווני אפור וזיהוי אזורים בהירים
+            const grayscaleData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = grayscaleData.data;
+            for (let i = 0; i < data.length; i += 4) {
+                const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+                data[i] = data[i + 1] = data[i + 2] = avg;
+            }
 
-        // בדיקה אם שלושה קלפים מהווים סט תקף
-        function isValidSet(card1, card2, card3) {
-            const properties = ['color', 'shape', 'count', 'fill'];
-            return properties.every(prop => {
-                const values = new Set([card1[prop], card2[prop], card3[prop]]);
-                return values.size === 1 || values.size === 3;
-            });
-        }
-
-        // מציאת כל הסטים האפשריים
-        function findSets(cards) {
-            const sets = [];
-            for (let i = 0; i < cards.length - 2; i++) {
-                for (let j = i + 1; j < cards.length - 1; j++) {
-                    for (let k = j + 1; k < cards.length; k++) {
-                        if (isValidSet(cards[i], cards[j], cards[k])) {
-                            sets.push([cards[i], cards[j], cards[k]]);
+            // זיהוי אזורים בהירים (קלפים)
+            const threshold = 200;
+            const cards = [];
+            for (let y = 0; y < canvas.height; y += 5) {
+                for (let x = 0; x < canvas.width; x += 5) {
+                    const idx = (y * canvas.width + x) * 4;
+                    if (data[idx] > threshold) {
+                        // מצאנו פיקסל בהיר - בדוק אם זה חלק מקלף
+                        const card = floodFill(data, canvas.width, canvas.height, x, y, threshold);
+                        if (card && card.width > 30 && card.height > 30) {
+                            cards.push(card);
                         }
                     }
                 }
             }
-            return sets;
+
+            return cards;
         }
 
-        // חישוב הערך השלישי הנדרש לסט
-        function calculateThirdValue(val1, val2) {
-            if (val1 === val2) return val1;
-            
-            const allValues = {
-                color: ['red', 'green', 'blue'],
-                shape: ['diamond', 'squiggle', 'oval'],
-                count: [1, 2, 3],
-                fill: ['empty', 'striped', 'solid']
-            };
-            
-            const category = Object.entries(allValues).find(([_, values]) => 
-                values.includes(val1) && values.includes(val2)
-            )[1];
-            
-            return category.find(val => val !== val1 && val !== val2);
-        }
+        function floodFill(data, width, height, startX, startY, threshold) {
+            const stack = [[startX, startY]];
+            const visited = new Set();
+            let minX = startX, maxX = startX, minY = startY, maxY = startY;
 
-        // בדיקת תקינות קלף
-        function isValidCard(card) {
-            return card.count >= 1 && card.count <= 3 &&
-                   ['red', 'green', 'blue'].includes(card.color) &&
-                   ['diamond', 'squiggle', 'oval'].includes(card.shape) &&
-                   ['empty', 'striped', 'solid'].includes(card.fill);
-        }
+            while (stack.length > 0) {
+                const [x, y] = stack.pop();
+                const key = `${x},${y}`;
+                
+                if (visited.has(key)) continue;
+                if (x < 0 || x >= width || y < 0 || y >= height) continue;
+                
+                const idx = (y * width + x) * 4;
+                if (data[idx] <= threshold) continue;
 
-        // מציאת השלמות אפשריות לסט
-        function findPotentialCompletions(cards) {
-            const completions = [];
-            for (let i = 0; i < cards.length - 1; i++) {
-                for (let j = i + 1; j < cards.length; j++) {
-                    const card1 = cards[i];
-                    const card2 = cards[j];
-                    
-                    const neededCard = {
-                        color: calculateThirdValue(card1.color, card2.color),
-                        shape: calculateThirdValue(card1.shape, card2.shape),
-                        count: calculateThirdValue(card1.count, card2.count),
-                        fill: calculateThirdValue(card1.fill, card2.fill)
-                    };
-                    
-                    if (isValidCard(neededCard)) {
-                        completions.push({
-                            pair: [card1, card2],
-                            needed: neededCard
-                        });
-                    }
-                }
+                visited.add(key);
+                minX = Math.min(minX, x);
+                maxX = Math.max(maxX, x);
+                minY = Math.min(minY, y);
+                maxY = Math.max(maxY, y);
+
+                stack.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]);
             }
-            return completions;
+
+            if (visited.size < 100) return null; // רעש
+
+            return {
+                x: minX,
+                y: minY,
+                width: maxX - minX,
+                height: maxY - minY
+            };
         }
 
-        // פונקציות תצוגה
-        function formatCard(card) {
-            return `${card.count} ${translateToHebrew(card.fill)} ${translateToHebrew(card.color)} ${translateToHebrew(card.shape)}`;
-        }
-
-        function showError(message) {
-            const errorDiv = document.getElementById('error');
-            errorDiv.textContent = message;
-            errorDiv.style.display = 'block';
-            setTimeout(() => {
-                errorDiv.style.display = 'none';
-            }, 3000);
-        }
-
-        function setLoading(isLoading) {
-            document.getElementById('loading').style.display = isLoading ? 'block' : 'none';
-        }
-
-        function showCurrentCards() {
-            setLoading(true);
-            const container = document.getElementById('currentCards');
-            container.innerHTML = '<h2>קלפים נוכחיים:</h2>';
+        function analyzeCard(ctx, card) {
+            const cardData = ctx.getImageData(card.x, card.y, card.width, card.height);
             
-            cards.forEach((card, index) => {
-                const cardElement = document.createElement('div');
-                cardElement.className = 'card';
-                cardElement.innerHTML = `
-                    קלף ${index + 1}:<br>
-                    ${formatCard(card)}
-                `;
-                container.appendChild(cardElement);
-            });
-            setLoading(false);
+            // ניתוח צבע
+            const colors = analyzeColors(cardData.data);
+            
+            // ניתוח צורה
+            const shape = analyzeShape(cardData.data, card.width, card.height);
+            
+            // ספירת צורות
+            const count = countShapes(cardData.data, card.width, card.height);
+            
+            // זיהוי מילוי
+            const fill = analyzeFill(cardData.data);
+
+            return {
+                color: colors.dominantColor,
+                shape: shape,
+                count: count,
+                fill: fill
+            };
         }
 
-        function findAllSets() {
-            setLoading(true);
-            const sets = findSets(cards);
-            const resultsDiv = document.getElementById('results');
+        // פונקציות ניתוח נוספות...
+        function analyzeColors(data) {
+            const colors = { red: 0, green: 0, blue: 0 };
+            for (let i = 0; i < data.length; i += 4) {
+                const r = data[i], g = data[i + 1], b = data[i + 2];
+                if (r > g && r > b) colors.red++;
+                if (g > r && g > b) colors.green++;
+                if (b > r && b > g) colors.blue++;
+            }
+            return {
+                dominantColor: Object.entries(colors).reduce((a, b) => a[1] > b[1] ? a : b)[0]
+            };
+        }
 
+        function analyzeShape(data, width, height) {
+            // פשוט לדוגמה - צריך לשפר
+            return 'diamond';
+        }
+
+        function countShapes(data, width, height) {
+            // פשוט לדוגמה - צריך לשפר
+            return 1;
+        }
+
+        function analyzeFill(data) {
+            // פשוט לדוגמה - צריך לשפר
+            return 'solid';
+        }
+
+        // טיפול בהעלאת תמונה
+        document.getElementById('imageInput').addEventListener('change', handleImageUpload);
+
+        function handleImageUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    // הצג את התמונה שהועלתה
+                    const uploadedImage = document.getElementById('uploadedImage');
+                    uploadedImage.src = e.target.result;
+                    uploadedImage.style.display = 'block';
+
+                    // הכן קנבס לניתוח
+                    const canvas = document.getElementById('analysisCanvas');
+                    const ctx = canvas.getContext('2d');
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    ctx.drawImage(img, 0, 0);
+
+                    // זהה קלפים
+                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    const detectedCards = detectCards(imageData);
+
+                    // נתח כל קלף
+                    const analyzedCards = detectedCards.map(card => analyzeCard(ctx, card));
+
+                    // מצא סטים
+                    const sets = findSets(analyzedCards);
+
+                    // הצג תוצאות
+                    displayResults(sets, ctx, detectedCards);
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function displayResults(sets, ctx, detectedCards) {
+            // צייר מסגרות סביב הקלפים שזוהו
+            ctx.strokeStyle = '#00ff00';
+            ctx.lineWidth = 2;
+            detectedCards.forEach(card => {
+                ctx.strokeRect(card.x, card.y, card.width, card.height);
+            });
+
+            // הצג את הקנבס
+            const canvas = document.getElementById('analysisCanvas');
+            canvas.style.display = 'block';
+
+            // הצג תוצאות
+            const resultsDiv = document.getElementById('results');
             if (sets.length === 0) {
-                resultsDiv.innerHTML = '<div class="result">לא נמצאו סטים אפשריים</div>';
-                setLoading(false);
+                resultsDiv.innerHTML = '<div class="result">לא נמצאו סטים</div>';
                 return;
             }
 
             resultsDiv.innerHTML = `<h2>נמצאו ${sets.length} סטים:</h2>`;
-            
             sets.forEach((set, index) => {
                 const setDiv = document.createElement('div');
                 setDiv.className = 'result';
                 setDiv.innerHTML = `
                     <h3>סט ${index + 1}:</h3>
                     ${set.map(card => 
-                        `<p>${formatCard(card)}</p>`
+                        `<p>${card.count} ${translateToHebrew(card.fill)} ${translateToHebrew(card.color)} ${translateToHebrew(card.shape)}</p>`
                     ).join('')}
-                    <div class="set-explanation">
-                        ${explainSet(set)}
-                    </div>
                 `;
                 resultsDiv.appendChild(setDiv);
             });
-            setLoading(false);
         }
 
-        function showPotentialCompletions() {
-            setLoading(true);
-            const completions = findPotentialCompletions(cards);
-            const resultsDiv = document.getElementById('results');
-            resultsDiv.innerHTML = '<h2>השלמות אפשריות:</h2>';
-            
-            if (completions.length === 0) {
-                resultsDiv.innerHTML += '<div class="result">לא נמצאו השלמות אפשריות</div>';
-                setLoading(false);
-                return;
-            }
-
-            completions.slice(0, 5).forEach((completion, index) => {
-                const div = document.createElement('div');
-                div.className = 'result';
-                div.innerHTML = `
-                    <h3>אפשרות ${index + 1}:</h3>
-                    <p>קלף 1: ${formatCard(completion.pair[0])}</p>
-                    <p>קלף 2: ${formatCard(completion.pair[1])}</p>
-                    <p>הקלף הנדרש: ${formatCard(completion.needed)}</p>
-                `;
-                resultsDiv.appendChild(div);
-            });
-            setLoading(false);
-        }
-
-        function explainSet(set) {
-            const explanations = [];
-            ['color', 'shape', 'count', 'fill'].forEach(prop => {
-                const values = new Set(set.map(card => card[prop]));
-                if (values.size === 1) {
-                    explanations.push(`כל הקלפים שווים ב${translateToHebrew(prop)} (${translateToHebrew(set[0][prop])})`);
-                } else {
-                    const translatedValues = Array.from(values).map(v => translateToHebrew(v));
-                    explanations.push(`כל הקלפים שונים ב${translateToHebrew(prop)} (${translatedValues.join(', ')})`);
-                }
-            });
-            return explanations.join('<br>');
-        }
-
-        // טעינה ראשונית
-        document.addEventListener('DOMContentLoaded', function() {
-            try {
-                showCurrentCards();
-            } catch (error) {
-                showError('אירעה שגיאה בטעינת המשחק');
-                console.error('Error:', error);
-            }
-        });
-
-        // טיפול בשגיאות כלליות
-        window.onerror = function(msg, url, lineNo, columnNo, error) {
-            showError('אירעה שגיאה בלתי צפויה');
-            console.error('Error:', msg, error);
-            return false;
-        };
+        // פונקציות נוספות שהיו קודם (isValidSet, findSets, translateToHebrew וכו')...
     </script>
 </body>
 </html>
